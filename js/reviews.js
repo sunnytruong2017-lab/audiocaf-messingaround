@@ -9,6 +9,24 @@
   const importBtn = document.getElementById('spotify-import');
   let spotifyCover = '';
 
+  // One floating player shared by all reviews, so review cards never change size.
+  const player = el('aside', { id: 'player', hidden: true });
+  const closeBtn = el('button', { type: 'button', className: 'player-close' }, '✕ close');
+  const frame = el('iframe', {
+    title: 'Spotify player',
+    allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
+  });
+  player.append(closeBtn, frame);
+  document.body.append(player);
+  closeBtn.addEventListener('click', () => {
+    player.hidden = true;
+    frame.src = 'about:blank';
+  });
+  function play(r) {
+    frame.src = `https://open.spotify.com/embed/album/${r.spotifyId}`;
+    player.hidden = false;
+  }
+
   const read = (k) => {
     try { return JSON.parse(localStorage.getItem(k)); } catch { return null; }
   };
@@ -62,30 +80,13 @@
 
     const actions = el('div', { className: 'actions' }, edit, remove);
     if (r.spotifyId) {
-      let frame = null;
       const preview = el('button', { className: 'edit', type: 'button' }, '▶ preview');
-      preview.addEventListener('click', () => {
-        if (!frame) {
-          frame = el('iframe', {
-            className: 'embed',
-            src: `https://open.spotify.com/embed/album/${r.spotifyId}`,
-            title: `Preview ${r.title} on Spotify`,
-            loading: 'lazy',
-            allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
-          });
-          info.append(frame);
-          preview.textContent = '■ hide preview';
-        } else {
-          frame.remove();
-          frame = null;
-          preview.textContent = '▶ preview';
-        }
-      });
+      preview.addEventListener('click', () => play(r));
       actions.prepend(preview);
     }
     const info = el('div', { className: 'album-info' },
       el('h3', {}, r.title),
-      el('ol', {}, ...r.tracks.map((t) => el('li', {}, t))),
+      el('ol', { className: r.tracks.length > 9 ? 'long' : '', tabIndex: 0 }, ...r.tracks.map((t) => el('li', {}, t))),
       actions);
 
     const article = el('article', { className: 'review user' },

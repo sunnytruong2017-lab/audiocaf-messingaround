@@ -86,3 +86,22 @@ body::before{
 #sound-toggle:focus-visible{
     background: rgba(0, 0, 0, 0.55);
 }
+
+/* Page transition: fade through cream, title morphs into the wordmark */
+@view-transition { navigation: auto; }
+::view-transition { background: #e9e9e5; }
+::view-transition-old(root) { animation: 500ms ease both vt-out; }
+::view-transition-new(root) { animation: 700ms ease 150ms both vt-in; }
+::view-transition-group(wordmark) {
+    animation-duration: 800ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes vt-out { to { opacity: 0; filter: blur(12px); } }
+@keyframes vt-in { from { opacity: 0; filter: blur(8px); } }
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) { animation: none; }
+}
+
+.title-layer:first-child { view-transition-name: wordmark; }
