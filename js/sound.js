@@ -59,67 +59,46 @@
   }
   ctx.onstatechange = fadeIn;
 
-  // Hover layer: vocal-style "mmm" hum (sawtooth through formant filters) plus a bell ping.
-  // Different timbre and register from the pad, and the pad ducks while it plays.
-  function ping() {
-    const t = ctx.currentTime;
-    [[880, 0.3], [1318.5, 0.18], [1760, 0.1]].forEach(([f, a]) => {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(a, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-      o.connect(g);
-      g.connect(master);
-      o.start(t);
-      o.stop(t + 1);
-    });
-  }
-
+  // Hover layer: soft hum on the same notes as the pad (A, E, A), so it blends in harmonically.
+  // Sine + a little triangle through a low-pass keeps it warm; louder than the pad (which ducks) so it's noticeable.
   function startHum() {
     if (ctx.state !== 'running' || hum) return;
     const t = ctx.currentTime;
     const out = ctx.createGain();
     out.gain.setValueAtTime(0, t);
-    out.gain.linearRampToValueAtTime(1.1, t + 0.1);
+    out.gain.linearRampToValueAtTime(1.3, t + 0.15);
     out.connect(master);
-    const src = ctx.createGain();
-    src.gain.value = 1;
-    [[300, 6, 1], [900, 8, 0.6], [2400, 10, 0.25]].forEach(([f, q, a]) => {
-      const bp = ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.value = f;
-      bp.Q.value = q;
-      const bg = ctx.createGain();
-      bg.gain.value = a;
-      src.connect(bp);
-      bp.connect(bg);
-      bg.connect(out);
-    });
-    const vib = ctx.createOscillator();
-    vib.frequency.value = 5.5;
-    const nodes = [vib];
-    [[196, 'sawtooth', -8], [196, 'sawtooth', 8], [98, 'sine', 0]].forEach(([f, type, d]) => {
-      const o = ctx.createOscillator();
-      o.type = type;
-      o.frequency.value = f;
-      o.detune.value = d;
-      const vg = ctx.createGain();
-      vg.gain.value = 4;
-      vib.connect(vg);
-      vg.connect(o.frequency);
-      const og = ctx.createGain();
-      og.gain.value = type === 'sine' ? 0.5 : 0.4;
-      o.connect(og);
-      og.connect(src);
-      o.start();
-      nodes.push(o);
-    });
-    vib.start();
-    ambient.gain.setTargetAtTime(AMBIENT * 0.2, t, 0.05); // duck the pad
-    ping();
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 520;
+    const trem = ctx.createGain(); // gentle amplitude wobble
+    trem.gain.value = 0.8;
+    lp.connect(trem);
+    trem.connect(out);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 3;
+    const lg = ctx.createGain();
+    lg.gain.value = 0.15;
+    lfo.connect(lg);
+    lg.connect(trem.gain);
+    lfo.start();
+
+    const nodes = [lfo];
+    [[110, 'sine', 0, 1], [110, 'triangle', 4, 0.35], [164.81, 'sine', 0, 0.7], [220, 'sine', 0, 0.5], [55, 'sine', 0, 0.6]]
+      .forEach(([f, type, d, a]) => {
+        const o = ctx.createOscillator();
+        o.type = type;
+        o.frequency.value = f;
+        o.detune.value = d;
+        const og = ctx.createGain();
+        og.gain.value = a;
+        o.connect(og);
+        og.connect(lp);
+        o.start();
+        nodes.push(o);
+      });
+    ambient.gain.setTargetAtTime(AMBIENT * 0.3, t, 0.05); // duck the pad
     hum = { out, nodes };
   }
 

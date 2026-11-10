@@ -60,10 +60,33 @@
       ? el('img', { src: r.cover, alt: `${r.title} album artwork`, loading: 'lazy' })
       : el('div', { className: 'album-ph' });
 
+    const actions = el('div', { className: 'actions' }, edit, remove);
+    if (r.spotifyId) {
+      let frame = null;
+      const preview = el('button', { className: 'edit', type: 'button' }, '▶ preview');
+      preview.addEventListener('click', () => {
+        if (!frame) {
+          frame = el('iframe', {
+            className: 'embed',
+            src: `https://open.spotify.com/embed/album/${r.spotifyId}`,
+            title: `Preview ${r.title} on Spotify`,
+            loading: 'lazy',
+            allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
+          });
+          info.append(frame);
+          preview.textContent = '■ hide preview';
+        } else {
+          frame.remove();
+          frame = null;
+          preview.textContent = '▶ preview';
+        }
+      });
+      actions.prepend(preview);
+    }
     const info = el('div', { className: 'album-info' },
       el('h3', {}, r.title),
       el('ol', {}, ...r.tracks.map((t) => el('li', {}, t))),
-      el('div', { className: 'actions' }, edit, remove));
+      actions);
 
     const article = el('article', { className: 'review user' },
       el('div', { className: 'review-body' }, score, copy),
@@ -106,6 +129,7 @@
       form.elements.score.value = r.score;
       form.elements.text.value = r.text;
       form.elements.tracks.value = r.tracks.join('\n');
+      if (r.spotifyId) form.elements.spotify.value = `https://open.spotify.com/album/${r.spotifyId}`;
     }
     dialog.showModal();
   }
@@ -166,6 +190,7 @@
       text: f.get('text').trim(),
       tracks: f.get('tracks').split('\n').map((s) => s.trim()).filter(Boolean),
       cover: upload || spotifyCover || (existing ? existing.cover : ''),
+      spotifyId: albumId(f.get('spotify').trim()) || '',
     };
     if (existing) list[list.indexOf(existing)] = r; else list.unshift(r);
     if (!save(list)) return;
