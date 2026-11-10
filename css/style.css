@@ -68,3 +68,21 @@ body::before{
         animation: none;
     }
 }
+
+#sound-toggle{
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    padding: 8px 14px;
+    font: 0.8rem "helvetica-lt-pro", Helvetica, Arial, sans-serif;
+    color: azure;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+#sound-toggle:hover,
+#sound-toggle:focus-visible{
+    background: rgba(0, 0, 0, 0.55);
+}
