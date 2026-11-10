@@ -9,6 +9,12 @@
   const importBtn = document.getElementById('spotify-import');
   let spotifyCover = '';
 
+  const el = (tag, props = {}, ...kids) => {
+    const n = Object.assign(document.createElement(tag), props);
+    n.append(...kids);
+    return n;
+  };
+
   // One floating player shared by all reviews, so review cards never change size.
   const player = el('aside', { id: 'player', hidden: true });
   const closeBtn = el('button', { type: 'button', className: 'player-close' }, '✕ close');
@@ -46,12 +52,6 @@
       return false;
     }
   }
-
-  const el = (tag, props = {}, ...kids) => {
-    const n = Object.assign(document.createElement(tag), props);
-    n.append(...kids);
-    return n;
-  };
 
   // *text* renders as italics
   const rich = (text) => text.split('*').map((s, i) => (i % 2 ? el('em', {}, s) : s));
