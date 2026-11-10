@@ -1,0 +1,70 @@
+h1{
+    font-family: "helvetica-lt-pro", sans-serif;
+font-weight: 400;
+font-style: normal;
+color: azure;
+width: max-content;
+transition: transform 180ms ease, text-shadow 180ms ease;
+}
+h1:hover{
+    transform: scale(1.1);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 255, 255, 0.65);
+}
+h1 a{
+    color: inherit;
+    text-decoration: none;
+}
+.title-stack{
+    position: relative;
+    display: inline-block;
+}
+.title-layer{
+    display: block;
+    transition: transform 450ms ease, opacity 250ms ease;
+}
+.title-layer:not(:first-child){
+    position: absolute;
+    inset: 0 auto auto 0;
+    opacity: 0;
+}
+h1:hover .title-layer:first-child{
+    transform: translateY(-0.525em);
+}
+h1:hover .title-layer:nth-child(2){
+    transform: translateY(-0.175em);
+    opacity: 1;
+}
+h1:hover .title-layer:nth-child(3){
+    transform: translateY(0.175em);
+    opacity: 1;
+}
+h1:hover .title-layer:nth-child(4){
+    transform: translateY(0.525em);
+    opacity: 1;
+}
+body{
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    place-items: center; 
+    height: 100vh;       
+    margin: 0;
+}
+body::before{
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: url(../img/glassflip.jpg) center / cover no-repeat;
+    animation: grass-flow 24s ease-in-out infinite alternate;
+}
+@keyframes grass-flow{
+    from{ transform: scale(1.03) translate3d(-1.5%, 0.5%, 0); }
+    to{ transform: scale(1.08) translate3d(1.5%, -1%, 0); }
+}
+@media (prefers-reduced-motion: reduce){
+    body::before{
+        animation: none;
+    }
+}
