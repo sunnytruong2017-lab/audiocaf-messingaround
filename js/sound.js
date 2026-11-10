@@ -1,12 +1,19 @@
 (() => {
   const TARGET = 0.5;
+  const AMBIENT = 0.1;
   const btn = document.getElementById('sound-toggle');
   const title = document.querySelector('h1');
-  let ctx, master, hum, muted = false;
+  let muted = false, hum = null, ramped = false;
 
-  function startAmbient() {
-    const bus = ctx.createGain();
-    bus.gain.value = 0.1;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  master.connect(ctx.destination);
+  const ambient = ctx.createGain();
+  ambient.gain.value = AMBIENT;
+
+  // Ambient pad: soft Am9 chord, slow-swelling detuned sines + echo
+  (function buildAmbient() {
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 800;
@@ -16,12 +23,10 @@
     fb.gain.value = 0.45;
     delay.connect(fb);
     fb.connect(delay);
-    bus.connect(lp);
+    ambient.connect(lp);
     lp.connect(master);
     lp.connect(delay);
     delay.connect(master);
-
-    // Soft Am9 pad: slow-swelling detuned sines
     [110, 164.81, 220, 246.94, 329.63].forEach((f, i) => {
       [-5, 5].forEach((d) => {
         const o = ctx.createOscillator();
@@ -37,55 +42,58 @@
         lfo.connect(lg);
         lg.connect(g.gain);
         o.connect(g);
-        g.connect(bus);
+        g.connect(ambient);
         o.start();
         lfo.start();
       });
     });
-  }
+  })();
 
-  function init() {
-    if (ctx) return;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain();
-    master.gain.value = 0;
-    master.connect(ctx.destination);
-    startAmbient();
-    ctx.resume();
-    master.gain.linearRampToValueAtTime(TARGET, ctx.currentTime + 4);
+  function fadeIn() {
+    if (ramped || ctx.state !== 'running') return;
+    ramped = true;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(muted ? 0 : TARGET, ctx.currentTime + 3);
     render();
   }
+  ctx.onstatechange = fadeIn;
 
+  // Hover layer: warm, audible hum (A3 + E4 + A4 with slight beating and vibrato)
   function startHum() {
-    if (!ctx || hum) return;
+    if (ctx.state !== 'running' || hum) return;
     const t = ctx.currentTime;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.22, t + 0.6);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.12);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 420;
+    lp.frequency.value = 1400;
     lp.connect(g);
     g.connect(master);
-    const nodes = [[130.81, 'sine', 1], [196, 'sine', 0.5], [261.63, 'triangle', 0.15]]
-      .flatMap(([f, type, amp]) => {
-        const o = ctx.createOscillator();
-        o.type = type;
-        o.frequency.value = f;
-        const og = ctx.createGain();
-        og.gain.value = amp;
-        const v = ctx.createOscillator();
-        v.frequency.value = 4.5;
-        const vg = ctx.createGain();
-        vg.gain.value = f * 0.004;
-        v.connect(vg);
-        vg.connect(o.frequency);
-        o.connect(og);
-        og.connect(lp);
-        o.start();
-        v.start();
-        return [o, v];
-      });
+    ambient.gain.setTargetAtTime(AMBIENT * 0.35, t, 0.08); // duck pad so hum stands out
+    const nodes = [
+      [220, 'sine', 1, 0], [220, 'sine', 0.8, 6],
+      [329.63, 'sine', 0.6, 0], [440, 'triangle', 0.25, 0], [440, 'sine', 0.4, -7],
+    ].flatMap(([f, type, amp, detune]) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      o.detune.value = detune;
+      const og = ctx.createGain();
+      og.gain.value = amp * 0.5;
+      const v = ctx.createOscillator();
+      v.frequency.value = 5;
+      const vg = ctx.createGain();
+      vg.gain.value = f * 0.006;
+      v.connect(vg);
+      vg.connect(o.frequency);
+      o.connect(og);
+      og.connect(lp);
+      o.start();
+      v.start();
+      return [o, v];
+    });
     hum = { g, nodes };
   }
 
@@ -96,31 +104,36 @@
     const t = ctx.currentTime;
     g.gain.cancelScheduledValues(t);
     g.gain.setValueAtTime(g.gain.value, t);
-    g.gain.linearRampToValueAtTime(0, t + 0.9);
-    nodes.forEach((n) => n.stop(t + 1));
+    g.gain.linearRampToValueAtTime(0, t + 0.2);
+    ambient.gain.setTargetAtTime(AMBIENT, t, 0.1);
+    nodes.forEach((n) => n.stop(t + 0.25));
   }
 
   function render() {
-    btn.textContent = !ctx ? '♪ tap for sound' : muted ? '♪ off' : '♪ on';
-    btn.setAttribute('aria-pressed', String(!!ctx && !muted));
+    const on = ctx.state === 'running';
+    btn.textContent = !on ? '♪ tap for sound' : muted ? '♪ off' : '♪ on';
+    btn.setAttribute('aria-pressed', String(on && !muted));
   }
 
   btn.addEventListener('click', () => {
-    if (!ctx) return init();
+    if (ctx.state !== 'running') return ctx.resume();
     muted = !muted;
-    master.gain.setTargetAtTime(muted ? 0 : TARGET, ctx.currentTime, 0.3);
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setTargetAtTime(muted ? 0 : TARGET, ctx.currentTime, 0.2);
     render();
   });
 
-  // Browsers block audio until a user gesture: any click/key/touch unlocks it.
+  // Try to start immediately; if the browser blocks it, any click/key/touch starts it.
+  ctx.resume().catch(() => {});
   const unlock = (e) => {
     if (btn.contains(e.target)) return;
-    init();
+    ctx.resume();
   };
-  document.addEventListener('pointerdown', unlock, { once: true });
-  document.addEventListener('keydown', unlock, { once: true });
+  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) =>
+    document.addEventListener(ev, unlock, { once: true }));
 
   title.addEventListener('mouseenter', startHum);
   title.addEventListener('mouseleave', stopHum);
   render();
+  fadeIn();
 })();
